@@ -39,6 +39,7 @@ const CATS = [
   { key: "dups", label: "Duplikate in Quarantäne", help: "Schlechtere Kopie desselben Liedes wird verschoben", flags: ["duplikat"] },
 ];
 
+const TITLE = document.title;
 const JOB_TITLES = { scan: "Sammlung wird geprüft", apply: "Änderungen werden angewendet", undo: "Lauf wird rückgängig gemacht" };
 
 function loadPref(key, fallback) {
@@ -161,6 +162,8 @@ async function pollStatus() {
       $("#prog-unit").textContent = j.phase === "Dateien suchen" ? "Lieder gefunden" : "";
       $("#prog-pct").textContent = "";
     }
+    // Fortschritt im Tab-Titel, damit er auch in einem Hintergrund-Tab sichtbar ist
+    document.title = `${j.total ? Math.floor(pct) + " %" : fmtN(j.done)} · ${TITLE}`;
     $("#prog-fill").style.width = pct + "%";
     $("#prog-bar").setAttribute("aria-valuenow", Math.round(pct));
     $("#prog-turtle").style.left = pct + "%";
@@ -203,6 +206,7 @@ async function pollStatus() {
 function stopPolling() {
   clearInterval(S.poll);
   S.poll = null;
+  document.title = TITLE;
   $("#progress").hidden = true;
   $("#btn-scan").disabled = false;
   $("#btn-apply").disabled = false;
