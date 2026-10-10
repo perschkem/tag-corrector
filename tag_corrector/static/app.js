@@ -317,7 +317,7 @@ function renderCats() {
   $("#cats").innerHTML = CATS.map((c) => {
     const n = c.flags.reduce((a, f) => Math.max(a, fl[f] || 0), 0);
     return `<label class="cat"><input type="checkbox" data-cat="${c.key}" ${S.cats[c.key] ? "checked" : ""}>
-      <span>${esc(c.label)} <span class="muted num">· ${fmtN(n)} Alben</span><small>${esc(c.help)}</small></span></label>`;
+      <span>${esc(c.label)} <span class="muted num">· ${fmtN(n)} ${n === 1 ? "Album" : "Alben"}</span><small>${esc(c.help)}</small></span></label>`;
   }).join("") + `<label class="cat touch-opt"><input type="checkbox" data-cat="touch" id="opt-touch" ${S.cats.touch ? "checked" : ""}>
       <span>Änderungsdatum auf jetzt setzen<small>Für jede geänderte oder umbenannte Datei. Ohne Haken bleibt das ursprüngliche Änderungsdatum erhalten.</small></span></label>`;
 }
@@ -738,17 +738,17 @@ $("#btn-apply").addEventListener("click", async () => {
   catch (err) { await ask("Das hat nicht geklappt", `<p class="error">${esc(err.message)}</p>`, "OK", true); return; }
   const c = pv.counts;
   const lines = [
-    [c.tags, "Lieder bekommen neue Tags"],
-    [c.junk, "Lieder: Kommentare & Tag-Müll werden entfernt"],
-    [c.moves, "Lieder werden verschoben oder umbenannt"],
-    [c.cover_embed, "Lieder bekommen ein Cover eingebettet"],
-    [c.cover_fix, "Lieder: eingebettetes Cover wird verkleinert/repariert"],
-    [c.cover_files, "Cover werden heruntergeladen"],
-    [c.dups, "Duplikate gehen in die Quarantäne"],
-    [c.extras, "Fremddateien gehen in die Quarantäne"],
-    [c.carry, "Bilder werden mit umgezogen"],
-    [pv.misc, "sonstige Einträge"],
-  ].filter(([n]) => n);
+    [c.tags, "Lied bekommt neue Tags", "Lieder bekommen neue Tags"],
+    [c.junk, "Lied: Kommentare & Tag-Müll werden entfernt", "Lieder: Kommentare & Tag-Müll werden entfernt"],
+    [c.moves, "Lied wird verschoben oder umbenannt", "Lieder werden verschoben oder umbenannt"],
+    [c.cover_embed, "Lied bekommt ein Cover eingebettet", "Lieder bekommen ein Cover eingebettet"],
+    [c.cover_fix, "Lied: eingebettetes Cover wird verkleinert/repariert", "Lieder: eingebettetes Cover wird verkleinert/repariert"],
+    [c.cover_files, "Cover wird heruntergeladen", "Cover werden heruntergeladen"],
+    [c.dups, "Duplikat geht in die Quarantäne", "Duplikate gehen in die Quarantäne"],
+    [c.extras, "Fremddatei geht in die Quarantäne", "Fremddateien gehen in die Quarantäne"],
+    [c.carry, "Bild wird mit umgezogen", "Bilder werden mit umgezogen"],
+    [pv.misc, "sonstiger Eintrag", "sonstige Einträge"],
+  ].filter(([n]) => n).map(([n, one, many]) => [n, n === 1 ? one : many]);
   const ok = await ask("Änderungen jetzt anwenden?", `
     ${lines.length ? `<table class="confirm-table">${lines.map(([n, t]) => `<tr><td class="num">${fmtN(n)}</td><td>${esc(t)}</td></tr>`).join("")}</table>`
       : `<p>Mit den gewählten Bereichen gibt es nichts zu tun.</p>`}
