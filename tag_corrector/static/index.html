@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>tag-corrector</title>
+<link rel="icon" href="/static/favicon.png">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="masthead">
+  <div class="wrap masthead-inner">
+    <img class="logo" src="/static/img/turtles/pruefen.webp" alt="">
+    <div>
+      <h1>tag-corrector</h1>
+      <p class="tagline">Prüft und korrigiert Struktur, Tags, Jahr, Cover und Fremddateien deiner Musiksammlung.</p>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- 1 · Einstellungen -->
+  <section id="setup" class="panel">
+    <details id="setup-details" open>
+      <summary><h2>Musikordner</h2><span id="setup-summary" class="muted"></span></summary>
+      <form id="setup-form" autocomplete="off">
+        <div class="field wide">
+          <label for="root">Wurzelordner der Sammlung</label>
+          <input id="root" name="root" list="root-list" placeholder="/mnt/d/Musik  oder  D:\Musik" required>
+          <datalist id="root-list"></datalist>
+          <small>Erwartete Struktur: <code>&lt;Wurzel&gt;/&lt;Interpret&gt;/&lt;Album&gt;/01 - Titel.ext</code></small>
+        </div>
+        <div class="field">
+          <label for="subdir">Nur Teilordner prüfen (optional)</label>
+          <input id="subdir" name="subdir" placeholder="z.B. Radiohead">
+          <small>Praktisch zum Ausprobieren. Ziele werden trotzdem relativ zur Wurzel berechnet.</small>
+        </div>
+        <div class="field">
+          <label for="year_mode">Welches Jahr?</label>
+          <select id="year_mode" name="year_mode">
+            <option value="original">Original-Erscheinungsjahr des Albums</option>
+            <option value="release">Jahr dieser Ausgabe (z.B. Remaster)</option>
+          </select>
+        </div>
+        <fieldset class="toggles">
+          <legend>Optionen</legend>
+          <label class="check"><input type="checkbox" id="use_mb" name="use_mb" checked> Mit MusicBrainz abgleichen <small>(ca. 1–2 s pro Album, danach im Cache)</small></label>
+          <label class="check"><input type="checkbox" id="simplify_typo" name="simplify_typo" checked> Typografische Zeichen vereinfachen <small>(’ → ', … → ...)</small></label>
+          <label class="check"><input type="checkbox" id="fetch_cover" name="fetch_cover" checked> Fehlende Cover laden</label>
+          <label class="check"><input type="checkbox" id="embed_cover" name="embed_cover" checked> Cover in Dateien einbetten</label>
+        </fieldset>
+        <details class="advanced">
+          <summary>Erweitert</summary>
+          <div class="adv-grid">
+            <div class="field">
+              <label for="quarantine">Quarantäne-Ordner (in der Wurzel)</label>
+              <input id="quarantine" name="quarantine">
+            </div>
+            <div class="field">
+              <label for="cover_name">Dateiname für geladene Cover</label>
+              <input id="cover_name" name="cover_name">
+            </div>
+            <div class="field">
+              <label for="embed_max">Max. Größe eingebetteter Cover (px)</label>
+              <input id="embed_max" name="embed_max" type="number" min="100" max="3000" step="50">
+            </div>
+            <div class="field wide">
+              <label for="allowed">Erlaubte Dateien im Albumordner (Muster, kommagetrennt)</label>
+              <textarea id="allowed" name="allowed" rows="2"></textarea>
+            </div>
+            <div class="field wide">
+              <label for="allowed_dirs">Erlaubte Unterordner für Bilder</label>
+              <input id="allowed_dirs" name="allowed_dirs">
+            </div>
+            <div class="field wide">
+              <label for="allowed_root">Zusätzlich erlaubt, aber nur direkt im Wurzelordner</label>
+              <input id="allowed_root" name="allowed_root">
+              <small>Playlisten an jeder anderen Stelle gelten als Fremddatei.</small>
+            </div>
+          </div>
+        </details>
+        <div class="actions">
+          <button type="submit" class="btn primary" id="btn-scan">Sammlung prüfen</button>
+          <span class="muted">Es wird noch nichts verändert, zuerst bekommst du eine Vorschau.</span>
+        </div>
+        <p id="setup-error" class="error" hidden></p>
+      </form>
+    </details>
+  </section>
+
+  <!-- 2 · Fortschritt -->
+  <section id="progress" class="panel" hidden>
+    <div class="progress-head">
+      <img class="turtle round busy" src="/static/img/turtles/pruefen.webp" alt="">
+      <div class="progress-title">
+        <h2 id="prog-title">Sammlung wird geprüft</h2>
+        <span id="prog-step" class="muted"></span>
+      </div>
+    </div>
+    <div class="current">
+      <span class="current-label" id="prog-label">Aktuelles Lied</span>
+      <b class="current-name ellipsis" id="prog-name">…</b>
+      <span class="current-dir mono muted ellipsis" id="prog-dir"></span>
+    </div>
+    <div class="bar" role="progressbar" aria-labelledby="prog-title" aria-valuemin="0" aria-valuemax="100" id="prog-bar">
+      <div class="fill" id="prog-fill"></div>
+      <div class="runner" id="prog-turtle" aria-hidden="true"></div>
+    </div>
+    <div class="progress-foot">
+      <span><b id="prog-count" class="num">0 / 0</b> <span id="prog-unit">verarbeitet</span> <span id="prog-pct" class="muted num"></span></span>
+      <span id="prog-eta" class="muted num"></span>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btn-skip-mb" hidden>MusicBrainz überspringen, Rest offline</button>
+      <button class="btn ghost danger" id="btn-abort">Abbrechen</button>
+    </div>
+  </section>
+
+  <!-- 3 · Ergebnis eines Laufs -->
+  <section id="result" class="panel" hidden></section>
+
+  <!-- 4 · Vorschau -->
+  <section id="review" hidden>
+    <div class="panel overview">
+      <div class="overview-head">
+        <h2>Vorschau der Änderungen</h2>
+        <span id="plan-root" class="mono muted ellipsis"></span>
+      </div>
+      <p id="stale-note" class="note warn" hidden>Die Sammlung wurde inzwischen verändert. Bitte neu prüfen, bevor du weitere Änderungen anwendest.</p>
+      <div class="stats" id="stats"></div>
+      <div class="cats">
+        <h3>Was soll gemacht werden?</h3>
+        <div id="cats" class="cat-grid"></div>
+      </div>
+    </div>
+
+    <div class="toolbar panel">
+      <input id="q" type="search" placeholder="Interpret oder Album suchen…" aria-label="Suchen">
+      <div class="seg" role="group" aria-label="Filter" id="filter">
+        <button data-f="changes" class="on">Mit Änderungen</button>
+        <button data-f="unsure">Unsicher</button>
+        <button data-f="offline">Ohne Treffer</button>
+        <button data-f="all">Alle</button>
+      </div>
+      <div class="toolbar-right">
+        <label class="check small"><input type="checkbox" id="show-unchanged"> unveränderte Lieder zeigen</label>
+        <button class="btn small ghost" id="btn-expand">Alle aufklappen</button>
+        <button class="btn small ghost" id="btn-collapse">Zuklappen</button>
+      </div>
+    </div>
+
+    <div id="tree" class="tree"></div>
+    <div id="misc"></div>
+
+    <div class="applybar">
+      <div class="wrap applybar-inner">
+        <span id="sel-summary" class="num"></span>
+        <div class="actions">
+          <button class="btn ghost small" id="btn-all-on">Alles an</button>
+          <button class="btn ghost small" id="btn-all-off">Alles aus</button>
+          <button class="btn primary" id="btn-apply">Änderungen anwenden</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · Rückgängig -->
+  <section class="panel" id="undo-panel">
+    <details id="undo-details">
+      <summary><h2>Verlauf &amp; Rückgängig</h2><span class="muted">Jeder Lauf wird protokolliert und kann zurückgedreht werden.</span></summary>
+      <div id="undo-list"></div>
+    </details>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" class="dlg-body">
+    <h2 id="dlg-title"></h2>
+    <div id="dlg-text"></div>
+    <div class="actions end">
+      <button value="cancel" class="btn ghost">Abbrechen</button>
+      <button value="ok" class="btn primary" id="dlg-ok">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
