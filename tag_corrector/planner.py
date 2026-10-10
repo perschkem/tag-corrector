@@ -32,7 +32,8 @@ DEFAULT_SETTINGS = {
 
 LABELS = {"title": "Titel", "artist": "Interpret", "album": "Album", "albumartist": "Albuminterpret",
           "track": "Track", "tracktotal": "Tracks gesamt", "disc": "CD", "disctotal": "CDs gesamt",
-          "year": "Jahr", "genre": "Genre", "compilation": "Sampler", "mbids": "MusicBrainz-IDs"}
+          "year": "Jahr", "genre": "Genre", "compilation": "Sampler", "mbids": "MusicBrainz-IDs",
+          "format": "Tag-Format"}
 
 _GENERIC_TITLE = re.compile(r"^(track|titel|title|audiotrack|audio track|unknown|unbekannt|piste|spur|"
                             r"pista)?\s*[-_ ]?\s*\d*$", re.I)
@@ -663,11 +664,11 @@ def plan_album(g, match, S, ov=None):
                 continue
             changes.append({"field": k, "label": LABELS[k], "old": _fmt(old), "new": _fmt(nv)})
             write[k] = nv
-        if f["kind"] == "ID3v2.4" and year and "year" not in write:
-            # Jahr steht in TDRC (v2.4), das Android-Player nicht lesen -> als ID3v2.3 (TYER) neu schreiben
-            changes.append({"field": "year", "label": LABELS["year"], "old": f"{_fmt(year)} (ID3v2.4)",
-                            "new": f"{_fmt(year)} (ID3v2.3)"})
-            write["year"] = year
+        if f["kind"] == "ID3v2.4":
+            # Jahr (TDRC) und UTF-8-Texte aus v2.4 lesen Android-Player falsch -> als ID3v2.3 neu schreiben
+            changes.append({"field": "format", "label": LABELS["format"], "old": "ID3v2.4",
+                            "new": "ID3v2.3 (Jahr und Sonderzeichen für Android)"})
+            write["format"] = "ID3v2.3"
         if "track" in write or "tracktotal" in write:
             write["track"], write["tracktotal"] = new["track"], new["tracktotal"]
         if "disc" in write or "disctotal" in write:

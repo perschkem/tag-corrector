@@ -248,7 +248,8 @@ class ID3File(TagFile):
 
     def _save_v23(self, **kw):
         """Als ID3v2.3 speichern: Android-Player (z.B. Musicolet) lesen das Jahr nur aus TYER,
-        nicht aus TDRC (v2.4) und zeigen sonst „0“. Sortier-Frames bleiben erhalten."""
+        nicht aus TDRC (v2.4), und zeigen UTF-8-Texte (nur v2.4) falsch an; mutagen schreibt
+        sie in v2.3 als UTF-16. Sortier-Frames bleiben erhalten."""
         t = self.f.tags
         keep = [fr for fid in ("TSOA", "TSOP", "TSOT") for fr in t.getall(fid)]
         t.update_to_v23()
