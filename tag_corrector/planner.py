@@ -663,6 +663,11 @@ def plan_album(g, match, S, ov=None):
                 continue
             changes.append({"field": k, "label": LABELS[k], "old": _fmt(old), "new": _fmt(nv)})
             write[k] = nv
+        if f["kind"] == "ID3v2.4" and year and "year" not in write:
+            # Jahr steht in TDRC (v2.4), das Android-Player nicht lesen -> als ID3v2.3 (TYER) neu schreiben
+            changes.append({"field": "year", "label": LABELS["year"], "old": f"{_fmt(year)} (ID3v2.4)",
+                            "new": f"{_fmt(year)} (ID3v2.3)"})
+            write["year"] = year
         if "track" in write or "tracktotal" in write:
             write["track"], write["tracktotal"] = new["track"], new["tracktotal"]
         if "disc" in write or "disctotal" in write:

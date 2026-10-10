@@ -117,6 +117,12 @@ class TagFile:
 class ID3File(TagFile):
     kind = "ID3"
 
+    def read(self):
+        r = super().read()
+        if self.f.tags is not None:
+            r["kind"] = "ID3v2.%d" % self.f.tags.version[1]
+        return r
+
     _MAP = {"title": "TIT2", "artist": "TPE1", "album": "TALB", "albumartist": "TPE2", "genre": "TCON"}
     _MBTXXX = {"mb_albumid": "MusicBrainz Album Id", "mb_releasegroupid": "MusicBrainz Release Group Id",
                "mb_artistid": "MusicBrainz Artist Id", "mb_albumartistid": "MusicBrainz Album Artist Id"}
@@ -233,12 +239,22 @@ class ID3File(TagFile):
             data, mime = cover
             t.add(APIC(encoding=3, mime=mime, type=3, desc="Cover", data=data))
         if self.path.lower().endswith(".mp3"):
-            self.f.save(v2_version=4, v1=0 if remove_junk else 1)
+            self._save_v23(v1=0 if remove_junk else 1)
             if remove_junk and self._has_ape():
                 from mutagen.apev2 import delete as ape_delete
                 ape_delete(self.path)
         else:
             self.f.save()
+
+    def _save_v23(self, **kw):
+        """Als ID3v2.3 speichern: Android-Player (z.B. Musicolet) lesen das Jahr nur aus TYER,
+        nicht aus TDRC (v2.4) und zeigen sonst „0“. Sortier-Frames bleiben erhalten."""
+        t = self.f.tags
+        keep = [fr for fid in ("TSOA", "TSOP", "TSOT") for fr in t.getall(fid)]
+        t.update_to_v23()
+        for fr in keep:
+            t.add(fr)
+        self.f.save(v2_version=3, **kw)
 
     def _snapshot(self):
         return [f for f in self.f.tags.values() if f.FrameID != "APIC"] if self.f.tags is not None else []
