@@ -370,6 +370,7 @@ function renderTree() {
   tree.innerHTML = parts.join("") || `<div class="panel"><p>Keine Alben für diesen Filter.</p>${
     S.filter === "changes" ? `<p class="muted">Alles ordentlich. ${fmtN(hidden)} Alben sind bereits korrekt.</p>` : ""}</div>`;
   for (const cb of $$(".cb-artist, .cb-album", tree)) cb.indeterminate = cb.dataset.state === "partial";
+  renderSelCats();
 }
 
 function artistHTML(name, albums) {
@@ -410,8 +411,13 @@ function albumHTML(a) {
 
 function albumDetailHTML(a) {
   const s = S.sel[a.id];
-  const srcs = a.source_dirs.map((x) => x === "." ? "(Wurzelordner)" : x);
   const moved = !(a.source_dirs.length === 1 && a.source_dirs[0] === a.dir);
+  // Bei einem einzigen Quellordner die Unterschiede zum Ziel markieren
+  const single = a.source_dirs.length === 1 && a.source_dirs[0] !== ".";
+  const [srcMarked, dirMarked] = moved && single ? diffMarks(a.source_dirs[0], a.dir) : [null, esc(a.dir)];
+  const srcs = a.source_dirs.map((x) => x === "." ? "(Wurzelordner)" : x).map(esc);
+  if (srcMarked !== null) srcs[0] = srcMarked;
+  const dirHint = single && caseOnly(a.source_dirs[0], a.dir) ? ` <span class="hint">nur Groß-/Kleinschreibung</span>` : "";
   const rel = a.release;
   const conf = Math.round((a.confidence || 0) * 100);
   const meterCls = conf >= 80 ? "" : conf >= 60 ? "lowish" : "low";
@@ -422,8 +428,8 @@ function albumDetailHTML(a) {
 
   return `
   <dl class="paths">
-    <dt>Ordner</dt><dd>${srcs.map(esc).join("<br>")}</dd>
-    ${moved ? `<dt>wird zu</dt><dd><b>${esc(a.dir)}</b></dd>` : ""}
+    <dt>Ordner</dt><dd class="${moved ? "old" : ""}">${srcs.join("<br>")}</dd>
+    ${moved ? `<dt>wird zu</dt><dd class="new"><b>${dirMarked}</b>${dirHint}</dd>` : ""}
     <dt>Album</dt><dd>${esc(a.target.albumartist)} · ${esc(a.target.album)} · ${esc(a.target.year || "Jahr unbekannt")}${a.target.compilation ? " · Sampler" : ""}${a.target.disctotal > 1 ? ` · ${a.target.disctotal} CDs` : ""}</dd>
   </dl>
   ${rel ? `<div class="release">
@@ -484,6 +490,43 @@ function editHTML(a) {
   </div>`;
 }
 
+/* Zeichenweiser Vergleich (LCS), damit auch eine einzelne geänderte Großschreibung auffällt.
+   Liefert [altHTML, neuHTML] mit <mark> um die geänderten Stellen. */
+function diffMarks(a, b) {
+  if (a === b) return [esc(a), esc(b)];
+  const n = a.length, m = b.length;
+  if (n * m > 250000) return [esc(a), `<mark>${esc(b)}</mark>`];
+  const L = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--)
+    L[i][j] = a[i] === b[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+  const ka = new Array(n).fill(false), kb = new Array(m).fill(false);   // true = unverändert
+  for (let i = 0, j = 0; i < n && j < m;) {
+    if (a[i] === b[j]) { ka[i++] = kb[j++] = true; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++;
+  }
+  // kurze „gleiche“ Inseln zwischen Änderungen mit markieren, sonst wird es zu zerstückelt
+  const smooth = (keep) => {
+    for (let i = 0; i < keep.length;) {
+      if (!keep[i]) { i++; continue; }
+      let k = i; while (k < keep.length && keep[k]) k++;
+      if (i > 0 && k < keep.length && k - i <= 2) keep.fill(false, i, k);
+      i = k;
+    }
+  };
+  smooth(ka); smooth(kb);
+  const render = (s, keep) => {
+    let out = "", i = 0;
+    while (i < s.length) {
+      let k = i; while (k < s.length && keep[k] === keep[i]) k++;
+      out += keep[i] ? esc(s.slice(i, k)) : `<mark>${esc(s.slice(i, k))}</mark>`;
+      i = k;
+    }
+    return out;
+  };
+  return [render(a, ka), render(b, kb)];
+}
+
+const caseOnly = (a, b) => a !== b && a.toLowerCase() === b.toLowerCase();
+
 function splitPath(p) {
   const i = p.lastIndexOf("/");
   return i < 0 ? ["", p] : [p.slice(0, i + 1), p.slice(i + 1)];
@@ -497,8 +540,14 @@ function trackHTML(a, t) {
   const [dd, df] = splitPath(t.dst);
   let fn;
   if (t.src === t.dst) fn = `<span class="same">${esc(sf)}</span>`;
-  else if (sd === dd) fn = `<span class="old">${esc(sf)}</span><span class="arrow">→</span><span class="new">${esc(df)}</span>`;
-  else fn = `<span class="old">${esc(t.src)}</span><span class="arrow">→</span><span class="new">${esc(t.dup ? t.dst : df)}</span>`;
+  else if (sf === df) fn = `<span class="same">${esc(sf)}</span> <span class="muted">(nur Ordner)</span>`;
+  else if (t.dup) fn = `<span class="old">${esc(t.src)}</span><span class="arrow">→</span><span class="new">${esc(t.dst)}</span>`;
+  else {
+    // Ordneränderungen stehen schon oben beim Album, hier nur den Dateinamen vergleichen
+    const [o, nw] = diffMarks(sf, df);
+    fn = `<span class="old">${sd === dd ? "" : esc(sd)}${o}</span><span class="arrow">→</span><span class="new">${nw}</span>`;
+    if (caseOnly(sf, df)) fn += ` <span class="hint">nur Groß-/Kleinschreibung</span>`;
+  }
   const cats = (t.cats || []).map(chip).join("");
   let row = `<tr class="trk ${on ? "" : "off"} ${t.dup ? "dup" : ""}" data-track="${esc(t.id)}">
     <td><input type="checkbox" class="cb-track" ${on ? "checked" : ""} ${t.has_changes ? "" : "disabled"} aria-label="Lied auswählen"></td>
@@ -681,15 +730,51 @@ $("#btn-expand").addEventListener("click", () => {
   renderTree();
 });
 $("#btn-collapse").addEventListener("click", () => { S.openArtists.clear(); S.openAlbums.clear(); renderTree(); });
+/* ---- Auswahl: alle / nach Kategorie (gilt für die aktuell gefilterten Alben) ---- */
+const visibleAlbums = () => Object.values(albumIndex).filter((a) => a.has_changes && albumVisible(a));
+
+function selectAlbums(albums, on) {
+  for (const a of albums) setAlbum(a.id, on);
+  const scroll = window.scrollY;
+  renderTree(); window.scrollTo(0, scroll); updateSelSummary();
+}
+
+function renderSelCats() {
+  if (!S.plan) return;
+  const vis = visibleAlbums();
+  $("#sel-cats").innerHTML = Object.keys(FLAGS).map((f) => {
+    const hit = vis.filter((a) => a.flags.includes(f));
+    if (!hit.length) return "";
+    const on = hit.filter((a) => albumState(a.id) !== "off").length;
+    const st = on === hit.length ? "on" : on ? "partial" : "off";
+    const tip = st === "on" ? "Klick wählt diese Alben ab" : "Klick wählt diese Alben an";
+    return `<button class="chip selchip c-${f} ${st}" data-flag="${f}" title="${esc(tip)}" aria-pressed="${st === "on"}">
+      ${st === "on" ? "✓ " : ""}${esc(FLAGS[f])} <span class="num">${fmtN(on)}/${fmtN(hit.length)}</span></button>`;
+  }).join("") || `<span class="muted">keine</span>`;
+}
+
+$("#sel-cats").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-flag]");
+  if (!b) return;
+  const hit = visibleAlbums().filter((a) => a.flags.includes(b.dataset.flag));
+  selectAlbums(hit, !hit.every((a) => albumState(a.id) !== "off"));
+});
 $("#btn-all-on").addEventListener("click", () => {
-  for (const id in albumIndex) if (albumIndex[id].has_changes) setAlbum(id, true);
-  renderTree(); renderMisc(); updateSelSummary();
+  selectAlbums(visibleAlbums(), true);
+  if (!S.q) { S.miscOn = new Set(S.plan.misc.map((m) => m.id)); renderMisc(); updateSelSummary(); }
 });
 $("#btn-all-off").addEventListener("click", () => {
-  for (const id in albumIndex) setAlbum(id, false);
-  S.miscOn.clear();
-  renderTree(); renderMisc(); updateSelSummary();
+  selectAlbums(Object.values(albumIndex).filter(albumVisible), false);
+  if (!S.q) { S.miscOn.clear(); renderMisc(); updateSelSummary(); }
 });
+
+/* ---- Bereiche: alle an / aus ---- */
+function setAllCats(on) {
+  for (const c of CATS) S.cats[c.key] = on;
+  renderCats(); updateSelSummary();
+}
+$("#btn-cats-on").addEventListener("click", () => setAllCats(true));
+$("#btn-cats-off").addEventListener("click", () => setAllCats(false));
 
 /* ---- Sonstiges (außerhalb von Alben) ----------------------------------- */
 function renderMisc() {
@@ -728,6 +813,7 @@ function updateSelSummary() {
   const { albums, tracks } = selectionPayload();
   const cats = CATS.filter((c) => S.cats[c.key]).length;
   $("#sel-summary").textContent = `${fmtN(albums)} Alben · ca. ${fmtN(tracks)} Lieder · ${S.miscOn.size} sonstige · ${cats}/${CATS.length} Bereiche aktiv`;
+  renderSelCats();
 }
 
 $("#btn-apply").addEventListener("click", async () => {

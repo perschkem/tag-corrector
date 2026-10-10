@@ -130,7 +130,11 @@
       <p id="stale-note" class="note warn" hidden>Die Sammlung wurde inzwischen verändert. Bitte neu prüfen, bevor du weitere Änderungen anwendest.</p>
       <div class="stats" id="stats"></div>
       <div class="cats">
-        <h3>Was soll gemacht werden?</h3>
+        <div class="cats-head">
+          <h3>Was soll gemacht werden?</h3>
+          <button class="btn small ghost" id="btn-cats-on">Alle an</button>
+          <button class="btn small ghost" id="btn-cats-off">Alle aus</button>
+        </div>
         <div id="cats" class="cat-grid"></div>
       </div>
     </div>
@@ -148,6 +152,13 @@
         <button class="btn small ghost" id="btn-expand">Alle aufklappen</button>
         <button class="btn small ghost" id="btn-collapse">Zuklappen</button>
       </div>
+      <div class="selbar" id="selbar">
+        <span class="selbar-label">Auswahl</span>
+        <button class="btn small" id="btn-all-on">Alle an</button>
+        <button class="btn small" id="btn-all-off">Alle aus</button>
+        <span class="selbar-label">nach Kategorie</span>
+        <span id="sel-cats" class="chips"></span>
+      </div>
     </div>
 
     <div id="tree" class="tree"></div>
@@ -157,8 +168,6 @@
       <div class="wrap applybar-inner">
         <span id="sel-summary" class="num"></span>
         <div class="actions">
-          <button class="btn ghost small" id="btn-all-on">Alles an</button>
-          <button class="btn ghost small" id="btn-all-off">Alles aus</button>
           <button class="btn primary" id="btn-apply">Änderungen anwenden</button>
         </div>
       </div>

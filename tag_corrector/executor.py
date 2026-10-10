@@ -100,9 +100,17 @@ class Executor:
         src, dst = self.abs(src_rel), self.abs(dst_rel)
         if not os.path.exists(src):
             raise FileNotFoundError(src_rel)
+        # Zuerst den Zielordner anlegen bzw. dessen Schreibweise korrigieren. Auf NTFS
+        # zeigt „Puddle Of Mudd/…“ sonst auf denselben Ordner wie „Puddle of Mudd/…“
+        # und der Ordner behielte die alte Schreibweise.
+        self.ensure_dir(os.path.dirname(dst_rel))
         if os.path.exists(dst):
             if os.path.samefile(src, dst):
                 if src == dst:
+                    return dst_rel
+                if os.path.basename(dst) in os.listdir(os.path.dirname(dst)):
+                    # Dateiname stimmt schon, nur der Ordner hatte eine andere Schreibweise
+                    self.moves[src_rel.lower()] = dst_rel
                     return dst_rel
                 tmp = dst + ".tc-tmp"
                 os.rename(src, tmp)
@@ -118,7 +126,6 @@ class Executor:
                 i += 1
             dst_rel = f"{stem} ({i}){ext}"
             dst = self.abs(dst_rel)
-        self.ensure_dir(os.path.dirname(dst_rel))
         shutil.move(src, dst)
         self.log.write({"op": "move", "src": src_rel, "dst": dst_rel})
         self.moves[src_rel.lower()] = dst_rel
